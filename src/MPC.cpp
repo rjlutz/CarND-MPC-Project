@@ -5,9 +5,8 @@
 using CppAD::AD;
 using namespace std;
 
-// TODO: Set the timestep length and duration
 size_t N = 10;
-double dt = 0.1;
+double dt = 0.05;
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -23,7 +22,7 @@ const double Lf = 2.67;
 
 double ref_cte = 0;
 double ref_epsi = 0;
-double ref_v = 30;
+double ref_v = 50;
 
 size_t x_start = 0;
 size_t y_start = x_start + N;
@@ -53,24 +52,34 @@ public:
 
       fg[0] = 0;
 
+      // penalty
+      double cost[] = {3000,  // cte
+                       3000,  // epsi
+                       10,    // speed
+                       5,     // steering actuator
+                       5,     // throttle actuator
+                       2000,  // steering rate
+                       10     // throttle rate
+      };
+
       // Reference State Cost
       // The part of the cost based on the reference state.
       for (int t = 0; t < N; t++) {
-        fg[0] += 2000 * CppAD::pow(vars[cte_start + t] - ref_cte, 2);
-        fg[0] += 2000 * CppAD::pow(vars[epsi_start + t] - ref_epsi, 2);
-        fg[0] += 1 * CppAD::pow(vars[v_start + t] - ref_v, 2);
+        fg[0] += cost[0] * CppAD::pow(vars[cte_start + t] - ref_cte, 2);
+        fg[0] += cost[1] * CppAD::pow(vars[epsi_start + t] - ref_epsi, 2);
+        fg[0] += cost[2] * CppAD::pow(vars[v_start + t] - ref_v, 2);
       }
 
       // Minimize the use of actuators.
       for (int t = 0; t < N - 1; t++) {
-        fg[0] += 5 * CppAD::pow(vars[delta_start + t], 2);
-        fg[0] += 5 * CppAD::pow(vars[a_start + t], 2);
+        fg[0] += cost[3] * CppAD::pow(vars[delta_start + t], 2);
+        fg[0] += cost[4] * CppAD::pow(vars[a_start + t], 2);
       }
 
       // Minimize the value gap between sequential actuations.
       for (int t = 0; t < N - 2; t++) {
-        fg[0] += 200 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
-        fg[0] += 10 * CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
+        fg[0] += cost[5] * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+        fg[0] += cost[6] * CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
       }
 
       //
@@ -113,11 +122,11 @@ public:
         // Only consider the actuation at time t.
         AD<double> delta0 = vars[delta_start + t - 1];
         AD<double> a0 = vars[a_start + t - 1];
-        AD<double> f_0 =
+        AD<double> f0 =
                 coeffs[0] + coeffs[1] * x0 +
                 coeffs[2] * x0 * x0 +
                 coeffs[3] * x0 * x0 * x0;
-        AD<double> psides_0 = CppAD::atan(
+        AD<double> psides0 = CppAD::atan(
                 3 * coeffs[3] * x0 * x0 +
                 2 * coeffs[2] * x0 +
                 coeffs[1]);
@@ -129,9 +138,9 @@ public:
         fg[1 + psi_start + t] = psi1 - (psi0 - v0 * delta0 / Lf * dt);
         fg[1 + v_start + t] = v1 - (v0 + a0 * dt);
         fg[1 + cte_start + t] =
-                cte1 - ((f_0 - y0) + (v0 * CppAD::sin(epsi0) * dt));
+                cte1 - ((f0 - y0) + (v0 * CppAD::sin(epsi0) * dt));
         fg[1 + epsi_start + t] =
-                epsi1 - ((psi0 - psides_0) + v0 * delta0 / Lf * dt);
+                epsi1 - ((psi0 - psides0) + v0 * delta0 / Lf * dt);
       }
     }
 
@@ -148,7 +157,6 @@ MPC::~MPC() {}
 
 vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   bool ok = true;
-  size_t i;
   typedef CPPAD_TESTVECTOR(double) Dvector;
 
   double x = state[0];
