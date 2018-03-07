@@ -52,18 +52,16 @@ public:
 
       fg[0] = 0;
 
-      // penalty
-      double cost[] = {3000,  // cte
-                       3000,  // epsi
-                       10,    // speed
+      // penalty / cost
+      double cost[] = {3000,  // cte reference state
+                       3000,  // epsi reference state
+                       10,    // speed reference state
                        5,     // steering actuator
                        5,     // throttle actuator
-                       2000,  // steering rate
-                       10     // throttle rate
+                       200,  // steering rate
+                       100     // throttle rate
       };
 
-      // Reference State Cost
-      // The part of the cost based on the reference state.
       for (int t = 0; t < N; t++) {
         fg[0] += cost[0] * CppAD::pow(vars[cte_start + t] - ref_cte, 2);
         fg[0] += cost[1] * CppAD::pow(vars[epsi_start + t] - ref_epsi, 2);
@@ -204,7 +202,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // Acceleration/deceleration lower and upper limits
   //NOTE: feel free to change this to something else
   for (int i = a_start; i < n_vars; i++) {
-    vars_lowerbound[i] = -1.0;
+    vars_lowerbound[i] = 0.0; // let's save the brake pads!
     vars_upperbound[i] = 1.0;
   }
 

@@ -66,6 +66,22 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
   return result;
 }
 
+double alpha_v = -1.0; // use -1 to flag uninitialized lowpass filter
+double alpha_a = -1.0;
+double prevailing_v;   // remember historical for lowpass
+double prevailing_a;
+
+double lowpass(double alpha, double current, double prevailing) {
+  double filtered = 0.0;
+  if (alpha < 1) { // establish history as first value
+    alpha = 0.9;
+    filtered = current;
+  } else {
+    filtered = current * (1-alpha) + prevailing * alpha;
+  }
+  return filtered;
+}
+
 int main() {
   uWS::Hub h;
 
@@ -119,18 +135,22 @@ int main() {
           double dt_delay = 0.1;
           double Lf = 2.67;
 
+          prevailing_v = lowpass(alpha_v, v, prevailing_v);
+          prevailing_a = lowpass(alpha_a, a, prevailing_a);
+
           Eigen::VectorXd state(6);
           // predict for state 'dt_delay' time units, in the future
-          state << v * dt_delay,
+          state << prevailing_v * dt_delay,
                   0,
-                  v * -delta/Lf *dt_delay,
-                  v + a * dt_delay,
-                  cte + v * sin(epsi) * dt_delay,
-                  epsi + v + a * -delta/Lf * dt_delay;
+                  prevailing_v * -delta/Lf *dt_delay,
+                  prevailing_v + prevailing_a * dt_delay,
+                  cte + prevailing_v * sin(epsi) * dt_delay,
+                  epsi + prevailing_v + prevailing_a * -delta/Lf * dt_delay;
 
           auto vars = mpc.Solve(state, coeffs);
 
-          // Green (MPC predicted) trajectory, relative to the vehicle's coordinate system
+          // Green (MPC predicted) trajectory, relative to the vehicle's
+          // coordinate system
           vector<double> mpc_x_vals;
           vector<double> mpc_y_vals;
           for (int i = 2; i < vars.size(); i++) {
@@ -140,12 +160,13 @@ int main() {
               mpc_y_vals.push_back(vars[i]);
           }
 
-          // Yellow line, pts relative to the vehicle's coordinate system
+          // Yellow  reference line, pts relative to the vehicle's
+          // coordinate system. for starts at 2, no need to draw under car
           vector<double> next_x_vals;
           vector<double> next_y_vals;
           double poly_inc = 2.5;
           int num_points = 25;
-          for (int i = 0; i < num_points; i++) {
+          for (int i = 2; i < num_points; i++) {
             next_x_vals.push_back(poly_inc*i);
             next_y_vals.push_back(polyeval(coeffs, poly_inc*i));
           }
