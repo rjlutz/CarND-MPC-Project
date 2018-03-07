@@ -71,7 +71,7 @@ int main() {
   uWS::Hub h;
 
   // MPC is initialized here!
-  MPC mpc(/*debug flag*/ true);
+  MPC mpc(debug_flag);
 
   h.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
@@ -101,11 +101,11 @@ int main() {
             ptsy[i] = shift_x * sin(0-psi) + shift_y * cos(0-psi);
           }
 
-          double* ptrx = &ptsx[0];  //convert vector<double> to Eigen
-          Eigen::Map<Eigen::VectorXd> ptsx_transform(ptrx, 6);
+          //double* ptrx = &ptsx[0];  //convert vector<double> to Eigen
+          Eigen::Map<Eigen::VectorXd> ptsx_transform(&ptsx[0], 6);
 
-          double* ptry = &ptsy[0];
-          Eigen::Map<Eigen::VectorXd> ptsy_transform(ptry, 6);
+          //double* ptry = &ptsy[0];
+          Eigen::Map<Eigen::VectorXd> ptsy_transform(&ptsy[0], 6);
 
           auto coeffs = polyfit(ptsx_transform, ptsy_transform, 3);
 
